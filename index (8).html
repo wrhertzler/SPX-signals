@@ -1,0 +1,1876 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SPX Signal Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0a0f;
+  --surface: #12121a;
+  --surface2: #1a1a26;
+  --border: #2a2a3a;
+  --text: #e4e4ef;
+  --text-dim: #7a7a8e;
+  --text-muted: #4a4a5e;
+  --green: #00e676;
+  --green-dim: #00e67622;
+  --red: #ff5252;
+  --red-dim: #ff525222;
+  --blue: #448aff;
+  --blue-dim: #448aff22;
+  --amber: #ffd740;
+  --amber-dim: #ffd74022;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+.grain {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 9999;
+}
+
+.container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 40px 20px 80px;
+}
+
+.header {
+  margin-bottom: 48px;
+}
+
+.header h1 {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+}
+
+.header .date {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* Loading state */
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  gap: 24px;
+}
+
+.loading .spinner {
+  width: 40px;
+  height: 40px;
+  border: 2px solid var(--border);
+  border-top-color: var(--blue);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.loading p {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+/* Error state */
+.error-box {
+  background: var(--red-dim);
+  border: 1px solid #ff525244;
+  border-radius: 8px;
+  padding: 24px;
+  margin: 40px 0;
+}
+
+.error-box h3 {
+  color: var(--red);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.error-box p {
+  color: var(--text-dim);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* Score hero */
+.score-hero {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 40px;
+  margin-bottom: 24px;
+  position: relative;
+  overflow: hidden;
+}
+
+.score-hero::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--score-color, var(--blue)), transparent);
+}
+
+.score-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 32px;
+}
+
+.price-block .price {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -1px;
+}
+
+.price-block .change {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  margin-top: 4px;
+}
+
+.vix-block {
+  text-align: right;
+}
+
+.vix-block .label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.vix-block .value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--amber);
+}
+
+.score-main {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.score-number {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 64px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -3px;
+}
+
+.score-meta .score-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.score-meta .score-prev {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* Score bar with alert zones */
+.score-bar-container {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+}
+
+.score-bar-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.score-bar-labels span {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.score-bar-zones {
+  display: flex;
+  margin-bottom: 6px;
+  gap: 2px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.zone {
+  text-align: center;
+  padding: 3px 0;
+  border-radius: 3px;
+  color: var(--text-muted);
+}
+
+.zone-short   { flex: 2; background: rgba(255,82,82,0.15); color: var(--red); }
+.zone-caution-bear { flex: 1.5; background: rgba(255,82,82,0.07); }
+.zone-neutral { flex: 3; background: var(--surface2); }
+.zone-caution-bull { flex: 1.5; background: rgba(0,230,118,0.07); }
+.zone-long    { flex: 2; background: rgba(0,230,118,0.15); color: var(--green); }
+
+.score-bar {
+  height: 6px;
+  background: linear-gradient(90deg, var(--red), var(--red-dim) 30%, var(--border) 45%, var(--border) 55%, var(--green-dim) 70%, var(--green));
+  border-radius: 3px;
+  position: relative;
+}
+
+.score-bar .marker {
+  position: absolute;
+  top: -5px;
+  width: 16px;
+  height: 16px;
+  background: var(--text);
+  border-radius: 50%;
+  transform: translateX(-50%);
+  box-shadow: 0 0 12px rgba(255,255,255,0.3);
+  transition: left 0.6s ease;
+}
+
+/* Trade Setup */
+.trade-setup {
+  margin-top: 16px;
+  margin-bottom: 24px;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.trade-setup-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 20px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.trade-setup-header .setup-icon {
+  font-size: 18px;
+}
+
+.trade-setup-header .setup-direction {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.trade-setup-header .setup-subtitle {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-left: auto;
+}
+
+.setup-long .trade-setup-header {
+  background: rgba(0, 230, 118, 0.1);
+  border: 1px solid rgba(0, 230, 118, 0.2);
+  border-radius: 12px 12px 0 0;
+}
+
+.setup-short .trade-setup-header {
+  background: rgba(255, 82, 82, 0.1);
+  border: 1px solid rgba(255, 82, 82, 0.2);
+  border-radius: 12px 12px 0 0;
+}
+
+.setup-wait .trade-setup-header {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 12px 12px 0 0;
+}
+
+.trade-setup-body {
+  padding: 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 12px 12px;
+}
+
+.setup-levels {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+@media (max-width: 640px) {
+  .setup-levels { grid-template-columns: 1fr; gap: 12px; }
+}
+
+.setup-level {
+  text-align: center;
+  padding: 14px;
+  border-radius: 8px;
+  background: var(--surface2);
+}
+
+.setup-level .level-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.setup-level .level-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.setup-level .level-detail {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+
+.setup-options-hint {
+  padding: 14px;
+  background: var(--surface2);
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-dim);
+}
+
+.setup-options-hint strong {
+  color: var(--text);
+}
+
+.setup-wait-msg {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  color: var(--text-dim);
+  line-height: 1.7;
+  padding: 8px 0;
+}
+
+/* Cards grid */
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+@media (max-width: 640px) {
+  .grid { grid-template-columns: 1fr; }
+  .score-number { font-size: 48px; }
+  .price-block .price { font-size: 24px; }
+  .container { padding: 24px 16px 60px; }
+  .score-hero { padding: 24px; }
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px;
+}
+
+.card.full { grid-column: 1 / -1; }
+
+.card h2 {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 20px;
+}
+
+/* Signal breakdown */
+.signal-group {
+  margin-bottom: 24px;
+}
+
+.signal-group:last-child { margin-bottom: 0; }
+
+.signal-group-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.signal-group-icon {
+  font-size: 16px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: var(--surface2);
+  flex-shrink: 0;
+}
+
+.signal-group-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.signal-group-verdict {
+  margin-left: auto;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 4px;
+}
+
+.verdict-bullish {
+  color: var(--green);
+  background: var(--green-dim);
+}
+
+.verdict-bearish {
+  color: var(--red);
+  background: var(--red-dim);
+}
+
+.verdict-neutral {
+  color: var(--text-dim);
+  background: var(--surface2);
+}
+
+.signal-row {
+  display: flex;
+  align-items: center;
+  padding: 8px 0 8px 38px;
+  border-bottom: 1px solid var(--border);
+  gap: 12px;
+}
+
+.signal-row:last-child { border-bottom: none; }
+
+.signal-name {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-dim);
+  width: 80px;
+  flex-shrink: 0;
+}
+
+.signal-bar-track {
+  flex: 1;
+  height: 4px;
+  background: var(--surface2);
+  border-radius: 2px;
+  position: relative;
+  overflow: visible;
+}
+
+.signal-bar-fill {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.6s ease;
+  min-width: 2px;
+}
+
+.signal-bar-fill.positive {
+  left: 50%;
+  background: var(--green);
+}
+
+.signal-bar-fill.negative {
+  right: 50%;
+  background: var(--red);
+}
+
+.signal-bar-center {
+  position: absolute;
+  left: 50%;
+  top: -3px;
+  width: 1px;
+  height: 10px;
+  background: var(--text-muted);
+}
+
+.signal-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 600;
+  width: 55px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* Narrative */
+.narrative {
+  background: var(--surface2);
+  border-radius: 10px;
+  padding: 20px;
+  margin-bottom: 24px;
+  border-left: 3px solid;
+}
+
+.narrative p {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text);
+}
+
+.narrative .narrative-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+/* MA levels */
+.ma-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.ma-row:last-child { border-bottom: none; }
+
+.ma-name {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  color: var(--text-dim);
+  width: 60px;
+}
+
+.ma-price {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.ma-dist {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  font-weight: 500;
+  width: 80px;
+  text-align: right;
+}
+
+/* Historical context */
+.context-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 640px) {
+  .context-grid { grid-template-columns: 1fr 1fr; }
+}
+
+.context-stat .stat-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+
+.context-stat .stat-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+/* Footer */
+.hold-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.hold-tab {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.hold-tab:hover {
+  border-color: var(--text-dim);
+  color: var(--text);
+}
+
+.hold-tab.active {
+  background: var(--blue-dim);
+  border-color: var(--blue);
+  color: var(--blue);
+}
+
+.context-panel {
+  display: none;
+}
+
+.context-panel.active {
+  display: block;
+}
+
+.footer {
+  margin-top: 48px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.8;
+  text-align: center;
+}
+
+/* Fade in animation */
+.fade-in {
+  animation: fadeIn 0.5s ease both;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in:nth-child(1) { animation-delay: 0.05s; }
+.fade-in:nth-child(2) { animation-delay: 0.1s; }
+.fade-in:nth-child(3) { animation-delay: 0.15s; }
+.fade-in:nth-child(4) { animation-delay: 0.2s; }
+.fade-in:nth-child(5) { animation-delay: 0.25s; }
+.fade-in:nth-child(6) { animation-delay: 0.3s; }
+</style>
+</head>
+<body>
+<div class="grain"></div>
+<div class="container" id="app">
+  <div class="header">
+    <h1>SPX Signal Dashboard</h1>
+    <div class="date" id="dateDisplay">Loading...</div>
+  </div>
+  <div class="loading" id="loadingState">
+    <div class="spinner"></div>
+    <p>Fetching SPX & VIX data...</p>
+  </div>
+  <div id="dashboard" style="display:none;"></div>
+  <div id="errorState" style="display:none;"></div>
+</div>
+
+<script>
+// ============================================================
+// SPX Signal Dashboard — Client-side computation
+// Mirrors the Python scoring engine
+// ============================================================
+
+// --- Data fetching with multiple fallbacks ---
+const PROXIES = [
+  (url) => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
+  (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  (url) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+];
+
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+async function fetchWithFallback(url) {
+  let lastError;
+  for (let i = 0; i < PROXIES.length; i++) {
+    try {
+      if (i > 0) await delay(500); // small pause between proxy attempts
+      const proxyUrl = PROXIES[i](url);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout
+      const resp = await fetch(proxyUrl, { signal: controller.signal });
+      clearTimeout(timeout);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const text = await resp.text();
+      if (!text.trim().startsWith('{') && !text.trim().startsWith('[')) {
+        throw new Error('Response is not JSON');
+      }
+      const json = JSON.parse(text);
+      if (!json.chart || !json.chart.result) {
+        throw new Error('Unexpected response structure');
+      }
+      return json;
+    } catch (e) {
+      lastError = e;
+      continue;
+    }
+  }
+  // Final fallback: try Yahoo directly (no proxy)
+  try {
+    const resp = await fetch(url);
+    if (resp.ok) {
+      const json = await resp.json();
+      if (json.chart && json.chart.result) return json;
+    }
+  } catch(e) { /* ignore */ }
+  throw new Error('Unable to fetch market data. Try refreshing or disabling ad blockers on this page.');
+}
+
+async function fetchYahooData(symbol, range = "2y", interval = "1d") {
+  const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?range=${range}&interval=${interval}`;
+  const json = await fetchWithFallback(yahooUrl);
+
+  const result = json.chart.result[0];
+  const timestamps = result.timestamp;
+  const quotes = result.indicators.quote[0];
+  const adjClose = result.indicators.adjclose?.[0]?.adjclose || quotes.close;
+
+  const data = [];
+  for (let i = 0; i < timestamps.length; i++) {
+    if (quotes.close[i] == null) continue;
+    data.push({
+      date: new Date(timestamps[i] * 1000),
+      open: quotes.open[i],
+      high: quotes.high[i],
+      low: quotes.low[i],
+      close: adjClose[i] || quotes.close[i],
+      volume: quotes.volume[i],
+    });
+  }
+  return data;
+}
+
+// --- Technical indicators ---
+function computeEMA(values, period) {
+  const k = 2 / (period + 1);
+  const ema = [values[0]];
+  for (let i = 1; i < values.length; i++) {
+    ema.push(values[i] * k + ema[i - 1] * (1 - k));
+  }
+  return ema;
+}
+
+function computeRSI(closes, period) {
+  const rsi = new Array(closes.length).fill(null);
+  if (closes.length < period + 1) return rsi;
+
+  let avgGain = 0, avgLoss = 0;
+  for (let i = 1; i <= period; i++) {
+    const delta = closes[i] - closes[i - 1];
+    if (delta > 0) avgGain += delta;
+    else avgLoss -= delta;
+  }
+  avgGain /= period;
+  avgLoss /= period;
+
+  rsi[period] = avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss);
+
+  for (let i = period + 1; i < closes.length; i++) {
+    const delta = closes[i] - closes[i - 1];
+    const gain = delta > 0 ? delta : 0;
+    const loss = delta < 0 ? -delta : 0;
+    avgGain = (avgGain * (period - 1) + gain) / period;
+    avgLoss = (avgLoss * (period - 1) + loss) / period;
+    rsi[i] = avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss);
+  }
+  return rsi;
+}
+
+function computeSMA(values, period) {
+  const sma = new Array(values.length).fill(null);
+  for (let i = period - 1; i < values.length; i++) {
+    let sum = 0;
+    for (let j = i - period + 1; j <= i; j++) sum += values[j];
+    sma[i] = sum / period;
+  }
+  return sma;
+}
+
+function computeMACD(closes) {
+  const ema12 = computeEMA(closes, 12);
+  const ema26 = computeEMA(closes, 26);
+  const macdLine = ema12.map((v, i) => v - ema26[i]);
+  const signalLine = computeEMA(macdLine, 9);
+  const histogram = macdLine.map((v, i) => v - signalLine[i]);
+  return { macdLine, signalLine, histogram };
+}
+
+function computeBollinger(closes, period = 20, numStd = 2) {
+  const sma = computeSMA(closes, period);
+  const pctB = new Array(closes.length).fill(null);
+
+  for (let i = period - 1; i < closes.length; i++) {
+    let sumSq = 0;
+    for (let j = i - period + 1; j <= i; j++) {
+      sumSq += (closes[j] - sma[i]) ** 2;
+    }
+    const std = Math.sqrt(sumSq / period);
+    const upper = sma[i] + numStd * std;
+    const lower = sma[i] - numStd * std;
+    pctB[i] = (upper - lower) === 0 ? 0.5 : (closes[i] - lower) / (upper - lower);
+  }
+  return pctB;
+}
+
+function computeATR(data, period = 14) {
+  const tr = data.map((d, i) => {
+    if (i === 0) return d.high - d.low;
+    const prev = data[i - 1].close;
+    return Math.max(d.high - d.low, Math.abs(d.high - prev), Math.abs(d.low - prev));
+  });
+  return computeSMA(tr, period);
+}
+
+// --- Signal scorers (match Python logic) ---
+function scoreRSI14(rsi) {
+  if (rsi == null) return 0;
+  if (rsi < 30) return 1;
+  if (rsi > 70) return -1;
+  return -(rsi - 50) / 20;
+}
+
+function scoreRSI5(rsi) {
+  if (rsi == null) return 0;
+  return Math.max(-1, Math.min(1, -(rsi - 50) / 30));
+}
+
+function scoreMACD(hist, histArray, idx) {
+  if (hist == null) return 0;
+  const lookback = 60;
+  const start = Math.max(0, idx - lookback);
+  const slice = histArray.slice(start, idx + 1).filter(v => v != null);
+  if (slice.length < 5) return 0;
+  const range = Math.max(...slice) - Math.min(...slice);
+  if (range === 0) return 0;
+  return Math.max(-1, Math.min(1, hist / (range / 2)));
+}
+
+function scoreMACross(shortMA, longMA) {
+  if (shortMA == null || longMA == null) return 0;
+  return shortMA > longMA ? 1 : -1;
+}
+
+function scoreBollinger(pctB) {
+  if (pctB == null) return 0;
+  return Math.max(-1, Math.min(1, -(pctB - 0.5) * 2));
+}
+
+function scoreVIX(vixClose, vixMA20) {
+  if (vixClose == null || vixMA20 == null || vixMA20 === 0) return 0;
+  const dev = (vixClose - vixMA20) / vixMA20;
+  return Math.max(-1, Math.min(1, dev * 3));
+}
+
+function scoreVolume(volRatio, dailyReturn) {
+  if (volRatio == null) return 0;
+  const direction = dailyReturn > 0 ? 1 : dailyReturn < 0 ? -1 : 0;
+  const excess = Math.max(-1, Math.min(1, volRatio - 1));
+  return Math.max(-1, Math.min(1, direction * excess * 0.5));
+}
+
+function scoreROC(roc) {
+  if (roc == null) return 0;
+  if (Math.abs(roc) > 15) return -Math.sign(roc) * 0.5;
+  return Math.max(-1, Math.min(1, roc / 10));
+}
+
+// --- Signal weights ---
+const SIGNAL_CONFIG = {
+  RSI_14:   { weight: 0.6 },
+  RSI_5:    { weight: 0.7 },
+  MACD:     { weight: 0.6 },
+  MA_20_50: { weight: 0.5 },
+  MA_50_200:{ weight: 0.4 },
+  Bollinger:{ weight: 0.6 },
+  VIX:      { weight: 0.8 },
+  Volume:   { weight: 0.3 },
+  ROC_20:   { weight: 0.5 },
+};
+
+// --- Main computation ---
+async function computeSignals() {
+  const [spxData, vixData] = await Promise.all([
+    fetchYahooData("^GSPC", "2y"),
+    fetchYahooData("^VIX", "2y"),
+  ]);
+
+  // Merge VIX into SPX by date
+  const vixMap = new Map();
+  vixData.forEach(d => {
+    const key = d.date.toISOString().slice(0, 10);
+    vixMap.set(key, d.close);
+  });
+
+  const data = spxData.map(d => ({
+    ...d,
+    dateStr: d.date.toISOString().slice(0, 10),
+    vixClose: vixMap.get(d.date.toISOString().slice(0, 10)) || null,
+  }));
+
+  // Forward-fill VIX
+  for (let i = 1; i < data.length; i++) {
+    if (data[i].vixClose == null) data[i].vixClose = data[i - 1].vixClose;
+  }
+
+  const closes = data.map(d => d.close);
+  const volumes = data.map(d => d.volume);
+  const vixCloses = data.map(d => d.vixClose);
+
+  // Compute indicators
+  const rsi14 = computeRSI(closes, 14);
+  const rsi5 = computeRSI(closes, 5);
+  const macd = computeMACD(closes);
+  const ma10 = computeSMA(closes, 10);
+  const ma20 = computeSMA(closes, 20);
+  const ma50 = computeSMA(closes, 50);
+  const ma200 = computeSMA(closes, 200);
+  const pctB = computeBollinger(closes);
+  const volMA20 = computeSMA(volumes, 20);
+  const vixMA20 = computeSMA(vixCloses, 20);
+  const atr = computeATR(data);
+
+  const i = data.length - 1;
+  const iPrev = data.length - 2;
+
+  // Score each signal
+  const signals = {
+    RSI_14:    scoreRSI14(rsi14[i]),
+    RSI_5:     scoreRSI5(rsi5[i]),
+    MACD:      scoreMACD(macd.histogram[i], macd.histogram, i),
+    MA_20_50:  scoreMACross(ma20[i], ma50[i]),
+    MA_50_200: scoreMACross(ma50[i], ma200[i]),
+    Bollinger: scoreBollinger(pctB[i]),
+    VIX:       scoreVIX(vixCloses[i], vixMA20[i]),
+    Volume:    scoreVolume(volMA20[i] ? volumes[i] / volMA20[i] : null, (closes[i] - closes[i - 1]) / closes[i - 1]),
+    ROC_20:    scoreROC(i >= 20 ? (closes[i] / closes[i - 20] - 1) * 100 : null),
+  };
+
+  // Previous day scores
+  const prevSignals = {
+    RSI_14:    scoreRSI14(rsi14[iPrev]),
+    RSI_5:     scoreRSI5(rsi5[iPrev]),
+    MACD:      scoreMACD(macd.histogram[iPrev], macd.histogram, iPrev),
+    MA_20_50:  scoreMACross(ma20[iPrev], ma50[iPrev]),
+    MA_50_200: scoreMACross(ma50[iPrev], ma200[iPrev]),
+    Bollinger: scoreBollinger(pctB[iPrev]),
+    VIX:       scoreVIX(vixCloses[iPrev], vixMA20[iPrev]),
+    Volume:    scoreVolume(volMA20[iPrev] ? volumes[iPrev] / volMA20[iPrev] : null, (closes[iPrev] - closes[iPrev - 1]) / closes[iPrev - 1]),
+    ROC_20:    scoreROC(iPrev >= 20 ? (closes[iPrev] / closes[iPrev - 20] - 1) * 100 : null),
+  };
+
+  // Composite score
+  let composite = 0;
+  let prevComposite = 0;
+  for (const [name, cfg] of Object.entries(SIGNAL_CONFIG)) {
+    composite += (signals[name] || 0) * cfg.weight;
+    prevComposite += (prevSignals[name] || 0) * cfg.weight;
+  }
+
+  // Historical context: compute for multiple hold periods
+  const HOLD_PERIODS = [5, 10, 20];
+  const maxHold = Math.max(...HOLD_PERIODS);
+
+  const allScores = [];
+  for (let j = 200; j < data.length - maxHold; j++) {
+    const s = {
+      RSI_14:    scoreRSI14(rsi14[j]),
+      RSI_5:     scoreRSI5(rsi5[j]),
+      MACD:      scoreMACD(macd.histogram[j], macd.histogram, j),
+      MA_20_50:  scoreMACross(ma20[j], ma50[j]),
+      MA_50_200: scoreMACross(ma50[j], ma200[j]),
+      Bollinger: scoreBollinger(pctB[j]),
+      VIX:       scoreVIX(vixCloses[j], vixMA20[j]),
+      Volume:    scoreVolume(volMA20[j] ? volumes[j] / volMA20[j] : null, j > 0 ? (closes[j] - closes[j - 1]) / closes[j - 1] : 0),
+      ROC_20:    scoreROC(j >= 20 ? (closes[j] / closes[j - 20] - 1) * 100 : null),
+    };
+    let sc = 0;
+    for (const [name, cfg] of Object.entries(SIGNAL_CONFIG)) {
+      sc += (s[name] || 0) * cfg.weight;
+    }
+    const fwdReturns = {};
+    for (const h of HOLD_PERIODS) {
+      if (j + h < closes.length) {
+        fwdReturns[h] = (closes[j + h] / closes[j] - 1) * 100;
+      }
+    }
+    allScores.push({ score: sc, fwdReturns });
+  }
+
+  // Find similar scores for context across all hold periods
+  const tolerance = 0.75;
+  const similar = allScores.filter(s => Math.abs(s.score - composite) <= tolerance);
+
+  const contexts = {};
+  for (const h of HOLD_PERIODS) {
+    const validSimilar = similar.filter(s => s.fwdReturns[h] != null);
+    if (validSimilar.length >= 10) {
+      const returns = validSimilar.map(s => s.fwdReturns[h]);
+      const sorted = [...returns].sort((a, b) => a - b);
+      contexts[h] = {
+        n: validSimilar.length,
+        winRate: (returns.filter(r => r > 0).length / returns.length * 100).toFixed(1),
+        avgReturn: (returns.reduce((a, r) => a + r, 0) / returns.length).toFixed(3),
+        medianReturn: sorted[Math.floor(sorted.length / 2)].toFixed(3),
+        worst: Math.min(...returns).toFixed(2),
+        best: Math.max(...returns).toFixed(2),
+      };
+    }
+  }
+
+  const dailyChange = ((closes[i] - closes[iPrev]) / closes[iPrev] * 100);
+  const atrPct = atr[i] ? (atr[i] / closes[i] * 100) : null;
+
+  // Chart data: last 90 trading days
+  const chartDays = 90;
+  const chartStart = Math.max(0, data.length - chartDays);
+  const chartData = [];
+  for (let j = chartStart; j < data.length; j++) {
+    // Compute bollinger bands for chart
+    const bbSma = ma20[j];
+    let bbUpper = null, bbLower = null;
+    if (bbSma != null && j >= 19) {
+      let sumSq = 0;
+      for (let k = j - 19; k <= j; k++) sumSq += (closes[k] - bbSma) ** 2;
+      const std = Math.sqrt(sumSq / 20);
+      bbUpper = bbSma + 2 * std;
+      bbLower = bbSma - 2 * std;
+    }
+    chartData.push({
+      date: data[j].dateStr,
+      open: data[j].open,
+      high: data[j].high,
+      low: data[j].low,
+      close: data[j].close,
+      volume: data[j].volume,
+      ma20: ma20[j],
+      ma50: ma50[j],
+      ma200: ma200[j],
+      bbUpper,
+      bbLower,
+      rsi14: rsi14[j],
+      macdHist: macd.histogram[j],
+      macdLine: macd.macdLine[j],
+      macdSignal: macd.signalLine[j],
+    });
+  }
+
+  return {
+    date: data[i].dateStr,
+    price: closes[i],
+    dailyChange,
+    vix: vixCloses[i],
+    atrPct,
+    composite: Math.round(composite * 100) / 100,
+    prevComposite: Math.round(prevComposite * 100) / 100,
+    signals,
+    mas: {
+      MA_10: ma10[i],
+      MA_20: ma20[i],
+      MA_50: ma50[i],
+      MA_200: ma200[i],
+    },
+    context: contexts,
+    holdPeriods: HOLD_PERIODS,
+    chartData,
+  };
+}
+
+// --- Rendering ---
+function scoreToLabel(score) {
+  if (score >= 3.5) return "STRONGLY BULLISH";
+  if (score >= 2.0) return "BULLISH";
+  if (score >= 0.5) return "SLIGHTLY BULLISH";
+  if (score >= -0.5) return "NEUTRAL";
+  if (score >= -2.0) return "SLIGHTLY BEARISH";
+  if (score >= -3.5) return "BEARISH";
+  return "STRONGLY BEARISH";
+}
+
+function scoreToColor(score) {
+  if (score >= 2.0) return "var(--green)";
+  if (score >= 0.5) return "#66bb6a";
+  if (score >= -0.5) return "var(--text-dim)";
+  if (score >= -2.0) return "#ef5350";
+  return "var(--red)";
+}
+
+function renderDashboard(result) {
+  const label = scoreToLabel(result.composite);
+  const color = scoreToColor(result.composite);
+  const changeColor = result.dailyChange >= 0 ? "var(--green)" : "var(--red)";
+  const scoreChange = result.composite - result.prevComposite;
+  const barPosition = ((result.composite + 5) / 10 * 100).toFixed(1);
+
+  // Signal grouping
+  const SIGNAL_GROUPS = [
+    {
+      title: "Mean Reversion",
+      icon: "↩",
+      description: "Is SPX oversold or overbought?",
+      signals: ["RSI_14", "RSI_5", "Bollinger"],
+    },
+    {
+      title: "Trend",
+      icon: "→",
+      description: "Which direction is the market moving?",
+      signals: ["MA_20_50", "MA_50_200", "MACD"],
+    },
+    {
+      title: "Volatility & Sentiment",
+      icon: "◈",
+      description: "How fearful or complacent is the market?",
+      signals: ["VIX"],
+    },
+    {
+      title: "Momentum & Confirmation",
+      icon: "◉",
+      description: "Is there conviction behind the move?",
+      signals: ["ROC_20", "Volume"],
+    },
+  ];
+
+  const signalEntries = Object.entries(result.signals)
+    .map(([name, raw]) => ({
+      name,
+      raw,
+      weight: SIGNAL_CONFIG[name].weight,
+      contrib: raw * SIGNAL_CONFIG[name].weight,
+    }));
+
+  function getVerdict(groupSignals) {
+    const total = groupSignals.reduce((sum, name) => {
+      const entry = signalEntries.find(e => e.name === name);
+      return sum + (entry ? entry.contrib : 0);
+    }, 0);
+    if (total >= 0.3) return { label: "Bullish", cls: "verdict-bullish" };
+    if (total <= -0.3) return { label: "Bearish", cls: "verdict-bearish" };
+    return { label: "Neutral", cls: "verdict-neutral" };
+  }
+
+  function renderSignalRow(s) {
+    const barWidth = Math.abs(s.contrib) / 0.8 * 50;
+    const isPositive = s.contrib >= 0;
+    const barColor = isPositive ? "positive" : "negative";
+    const valueColor = isPositive ? "var(--green)" : "var(--red)";
+    const LABELS = {
+      RSI_14: "RSI 14d", RSI_5: "RSI 5d", MACD: "MACD",
+      MA_20_50: "20/50 MA", MA_50_200: "50/200 MA", Bollinger: "Bollinger",
+      VIX: "VIX", Volume: "Volume", ROC_20: "20d ROC",
+    };
+    return `
+      <div class="signal-row">
+        <span class="signal-name">${LABELS[s.name] || s.name}</span>
+        <div class="signal-bar-track">
+          <div class="signal-bar-center"></div>
+          <div class="signal-bar-fill ${barColor}" style="width: ${barWidth}%"></div>
+        </div>
+        <span class="signal-value" style="color: ${valueColor}">${s.contrib >= 0 ? '+' : ''}${s.contrib.toFixed(2)}</span>
+      </div>`;
+  }
+
+  const signalGroupsHTML = SIGNAL_GROUPS.map(group => {
+    const verdict = getVerdict(group.signals);
+    const rows = group.signals
+      .map(name => signalEntries.find(e => e.name === name))
+      .filter(Boolean)
+      .map(renderSignalRow)
+      .join("");
+    return `
+      <div class="signal-group">
+        <div class="signal-group-header">
+          <div class="signal-group-icon">${group.icon}</div>
+          <span class="signal-group-title">${group.title}</span>
+          <span class="signal-group-verdict ${verdict.cls}">${verdict.label}</span>
+        </div>
+        ${rows}
+      </div>`;
+  }).join("");
+
+  // Auto-generate narrative
+  const meanReversionVerdict = getVerdict(SIGNAL_GROUPS[0].signals);
+  const trendVerdict = getVerdict(SIGNAL_GROUPS[1].signals);
+  const volVerdict = getVerdict(SIGNAL_GROUPS[2].signals);
+
+  function generateNarrative() {
+    const parts = [];
+
+    // Mean reversion story
+    const rsi5 = result.signals.RSI_5;
+    const boll = result.signals.Bollinger;
+    if (rsi5 > 0.5 && boll > 0.5) {
+      parts.push("SPX is <strong>oversold</strong> on short-term measures — both RSI and Bollinger Bands suggest price has stretched below its recent range.");
+    } else if (rsi5 < -0.5 && boll < -0.5) {
+      parts.push("SPX is <strong>overbought</strong> on short-term measures — both RSI and Bollinger Bands suggest price has stretched above its recent range.");
+    } else if (rsi5 > 0.3) {
+      parts.push("Short-term momentum is slightly oversold, suggesting a potential bounce.");
+    } else if (rsi5 < -0.3) {
+      parts.push("Short-term momentum is slightly overbought — upside may be limited near-term.");
+    } else {
+      parts.push("Short-term mean reversion signals are neutral — price is near the middle of its recent range.");
+    }
+
+    // Trend story
+    const ma2050 = result.signals.MA_20_50;
+    const ma50200 = result.signals.MA_50_200;
+    const macd = result.signals.MACD;
+    if (ma2050 < 0 && macd < -0.5) {
+      parts.push("However, the <strong>trend is bearish</strong> — the 20-day MA is below the 50-day, and MACD confirms downward momentum.");
+    } else if (ma2050 > 0 && macd > 0.5) {
+      parts.push("The <strong>trend supports this</strong> — the 20-day MA is above the 50-day with positive MACD momentum.");
+    } else if (ma2050 < 0 && macd > 0) {
+      parts.push("The trend is mixed — moving averages are bearish but momentum may be turning.");
+    } else if (ma2050 > 0 && macd < 0) {
+      parts.push("The trend is mixed — moving averages are positive but momentum is fading.");
+    } else {
+      parts.push("Trend signals are neutral with no clear directional bias.");
+    }
+
+    if (ma50200 > 0) {
+      parts[parts.length - 1] += " The long-term structure remains bullish (above 200 MA).";
+    } else {
+      parts[parts.length - 1] += " The long-term structure has turned bearish (below 200 MA).";
+    }
+
+    // VIX story
+    const vixScore = result.signals.VIX;
+    if (vixScore > 0.4) {
+      parts.push("Elevated VIX suggests <strong>fear in the market</strong> — historically a contrarian bullish signal as fear tends to mean-revert.");
+    } else if (vixScore < -0.4) {
+      parts.push("Low VIX indicates <strong>complacency</strong> — a contrarian caution sign as calm markets can precede volatility spikes.");
+    } else {
+      parts.push("Volatility is near normal levels with no extreme fear or complacency.");
+    }
+
+    // Bottom line
+    const score = result.composite;
+    if (score >= 2.0) {
+      parts.push("<strong>Bottom line:</strong> Multiple signals are aligned bullish. This is a higher-conviction long setup.");
+    } else if (score >= 0.5 && meanReversionVerdict.label === "Bullish" && trendVerdict.label === "Bearish") {
+      parts.push("<strong>Bottom line:</strong> This is a classic bounce-in-a-downtrend setup. Mean reversion favors a short-term bounce, but the trend is still against you — trade with tight stops or smaller size.");
+    } else if (score >= 0.5) {
+      parts.push("<strong>Bottom line:</strong> Mild bullish lean. Signals are somewhat supportive but not strongly aligned.");
+    } else if (score <= -2.0) {
+      parts.push("<strong>Bottom line:</strong> Multiple signals are aligned bearish. Caution warranted on long positions.");
+    } else if (score <= -0.5) {
+      parts.push("<strong>Bottom line:</strong> Mild bearish lean. Not a strong signal but the weight of evidence tilts negative.");
+    } else {
+      parts.push("<strong>Bottom line:</strong> Mixed signals — no clear edge either way. Consider sitting this one out or reducing size.");
+    }
+
+    return parts.join(" ");
+  }
+
+  const narrativeHTML = `
+    <div class="narrative fade-in" style="border-color: ${color}">
+      <div class="narrative-label">What the signals are saying</div>
+      <p>${generateNarrative()}</p>
+    </div>`;
+
+  // --- Trade Setup Generator ---
+  function generateTradeSetup(result) {
+    const score = result.composite;
+    const price = result.price;
+    const atrPct = result.atrPct || 1.5;
+    const atrDollar = price * (atrPct / 100);
+
+    // Determine trade direction and conviction
+    let direction, conviction, setupClass;
+    if (score >= 2.0) {
+      direction = "LONG"; conviction = "high"; setupClass = "setup-long";
+    } else if (score >= 1.0) {
+      direction = "LONG"; conviction = "moderate"; setupClass = "setup-long";
+    } else if (score <= -2.0) {
+      direction = "SHORT"; conviction = "high"; setupClass = "setup-short";
+    } else if (score <= -1.0) {
+      direction = "SHORT"; conviction = "moderate"; setupClass = "setup-short";
+    } else {
+      // No trade zone
+      return `
+        <div class="trade-setup setup-wait fade-in" style="margin-bottom:16px;">
+          <div class="trade-setup-header">
+            <span class="setup-icon">◽</span>
+            <span class="setup-direction" style="color:var(--text-dim)">No Trade</span>
+            <span class="setup-subtitle">Score in neutral zone (${score >= 0 ? '+' : ''}${score.toFixed(2)})</span>
+          </div>
+          <div class="trade-setup-body">
+            <div class="setup-wait-msg">
+              The composite score is between -1 and +1, meaning signals are mixed or weak. 
+              Wait for a stronger reading before putting on a position. 
+              The best trades come when multiple signal groups align — check back when the score moves outside the neutral zone.
+            </div>
+          </div>
+        </div>`;
+    }
+
+    const isLong = direction === "LONG";
+    const dirIcon = isLong ? "▲" : "▼";
+    const dirColor = isLong ? "var(--green)" : "var(--red)";
+
+    // Calculate levels
+    const stopMultiple = conviction === "high" ? 1.5 : 2.0;
+    const targetMultiple = conviction === "high" ? 2.5 : 2.0;
+
+    const stopDist = atrDollar * stopMultiple;
+    const targetDist = atrDollar * targetMultiple;
+
+    const stopPrice = isLong ? price - stopDist : price + stopDist;
+    const targetPrice = isLong ? price + targetDist : price - targetDist;
+
+    const stopPct = (stopDist / price * 100).toFixed(1);
+    const targetPct = (targetDist / price * 100).toFixed(1);
+    const rrRatio = (targetDist / stopDist).toFixed(1);
+
+    // SPX options guidance
+    const dteRange = conviction === "high" ? "7–14 DTE" : "14–21 DTE";
+    const strikeGuidance = isLong
+      ? `ATM or slightly ITM call (strike near ${Math.round(price / 5) * 5})`
+      : `ATM or slightly ITM put (strike near ${Math.round(price / 5) * 5})`;
+    const deltaGuidance = conviction === "high" ? "0.55–0.65 delta" : "0.45–0.55 delta";
+
+    // Context stats for the hold period
+    const ctx5 = result.context[5];
+    const winRateNote = ctx5 ? ` Historical win rate at this score: ${ctx5.winRate}%.` : '';
+
+    return `
+      <div class="trade-setup ${setupClass} fade-in" style="margin-bottom:16px;">
+        <div class="trade-setup-header">
+          <span class="setup-icon">${dirIcon}</span>
+          <span class="setup-direction" style="color:${dirColor}">${direction}</span>
+          <span class="setup-subtitle">${conviction} conviction · R:R ${rrRatio}:1${winRateNote}</span>
+        </div>
+        <div class="trade-setup-body">
+          <div class="setup-levels">
+            <div class="setup-level">
+              <div class="level-label">Entry Zone</div>
+              <div class="level-value" style="color:var(--text)">${price.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
+              <div class="level-detail">current price</div>
+            </div>
+            <div class="setup-level">
+              <div class="level-label">Stop Loss</div>
+              <div class="level-value" style="color:var(--red)">${stopPrice.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
+              <div class="level-detail">${stopMultiple}× ATR · -${stopPct}%</div>
+            </div>
+            <div class="setup-level">
+              <div class="level-label">Target</div>
+              <div class="level-value" style="color:var(--green)">${targetPrice.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
+              <div class="level-detail">${targetMultiple}× ATR · +${targetPct}%</div>
+            </div>
+          </div>
+          <div class="setup-options-hint">
+            <strong>SPX Options:</strong> Consider ${isLong ? 'calls' : 'puts'} with ${dteRange} expiry, ${deltaGuidance}. 
+            ${strikeGuidance}. 
+            ${conviction === "moderate" 
+              ? "Moderate conviction — consider smaller position size (25–50% of max). Set a mental stop if the underlying hits the stop level."
+              : "Higher conviction — standard size is appropriate but never risk more than you can afford to lose. Exit if underlying hits the stop level."}
+          </div>
+        </div>
+      </div>`;
+  }
+
+  // MA levels
+  const maHTML = Object.entries(result.mas).map(([name, val]) => {
+    if (val == null) return "";
+    const dist = ((result.price - val) / val * 100);
+    const distColor = dist >= 0 ? "var(--green)" : "var(--red)";
+    const arrow = dist >= 0 ? "▲" : "▼";
+    return `
+      <div class="ma-row">
+        <span class="ma-name">${name}</span>
+        <span class="ma-price">${val.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+        <span class="ma-dist" style="color: ${distColor}">${dist >= 0 ? '+' : ''}${dist.toFixed(1)}% ${arrow}</span>
+      </div>`;
+  }).join("");
+
+  // Context — multi-period with tabs
+  function renderContextPanel(ctx, holdDays) {
+    if (!ctx) return `<p style="color: var(--text-muted); font-size: 13px;">Not enough historical data for this score level.</p>`;
+    return `
+      <div class="context-grid">
+        <div class="context-stat">
+          <div class="stat-value" style="color: ${parseFloat(ctx.winRate) > 55 ? 'var(--green)' : parseFloat(ctx.winRate) < 45 ? 'var(--red)' : 'var(--text)'}">${ctx.winRate}%</div>
+          <div class="stat-label">Win Rate</div>
+        </div>
+        <div class="context-stat">
+          <div class="stat-value" style="color: ${parseFloat(ctx.avgReturn) >= 0 ? 'var(--green)' : 'var(--red)'}"> ${parseFloat(ctx.avgReturn) >= 0 ? '+' : ''}${ctx.avgReturn}%</div>
+          <div class="stat-label">Avg Return</div>
+        </div>
+        <div class="context-stat">
+          <div class="stat-value">${ctx.n}</div>
+          <div class="stat-label">Occurrences</div>
+        </div>
+        <div class="context-stat">
+          <div class="stat-value" style="color: var(--green)">${ctx.best}%</div>
+          <div class="stat-label">Best</div>
+        </div>
+        <div class="context-stat">
+          <div class="stat-value" style="color: var(--red)">${ctx.worst}%</div>
+          <div class="stat-label">Worst</div>
+        </div>
+        <div class="context-stat">
+          <div class="stat-value">${ctx.medianReturn}%</div>
+          <div class="stat-label">Median</div>
+        </div>
+      </div>`;
+  }
+
+  const holdTabsHTML = result.holdPeriods.map((h, idx) =>
+    `<button class="hold-tab ${idx === 0 ? 'active' : ''}" data-hold="${h}">${h}-Day</button>`
+  ).join("");
+
+  const holdPanelsHTML = result.holdPeriods.map((h, idx) =>
+    `<div class="context-panel ${idx === 0 ? 'active' : ''}" data-panel="${h}">
+      ${renderContextPanel(result.context[h], h)}
+    </div>`
+  ).join("");
+
+  document.getElementById("dashboard").innerHTML = `
+    <div class="score-hero fade-in" style="--score-color: ${color}">
+      <div class="score-top">
+        <div class="price-block">
+          <div class="price">${result.price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+          <div class="change" style="color: ${changeColor}">${result.dailyChange >= 0 ? '+' : ''}${result.dailyChange.toFixed(2)}%</div>
+        </div>
+        <div class="vix-block">
+          <div class="label">VIX</div>
+          <div class="value">${result.vix ? result.vix.toFixed(2) : '—'}</div>
+        </div>
+      </div>
+      <div class="score-main">
+        <div class="score-number" style="color: ${color}">${result.composite >= 0 ? '+' : ''}${result.composite.toFixed(2)}</div>
+        <div class="score-meta">
+          <div class="score-label" style="color: ${color}">${label}</div>
+          <div class="score-prev">prev ${result.prevComposite >= 0 ? '+' : ''}${result.prevComposite.toFixed(2)} · chg ${scoreChange >= 0 ? '+' : ''}${scoreChange.toFixed(2)}</div>
+        </div>
+      </div>
+      <div class="score-bar-container">
+        <div class="score-bar-labels">
+          <span>-5 Bearish</span>
+          <span>Neutral</span>
+          <span>Bullish +5</span>
+        </div>
+        <div class="score-bar-zones">
+          <div class="zone zone-short">Short</div>
+          <div class="zone zone-caution-bear">Lean ↓</div>
+          <div class="zone zone-neutral">No Trade</div>
+          <div class="zone zone-caution-bull">Lean ↑</div>
+          <div class="zone zone-long">Long</div>
+        </div>
+        <div class="score-bar">
+          <div class="marker" style="left: ${barPosition}%"></div>
+        </div>
+      </div>
+    </div>
+
+    ${generateTradeSetup(result)}
+
+    <div class="card full fade-in" style="margin-bottom: 16px;">
+      <h2>Price Chart — 90 Days</h2>
+      <canvas id="priceChart" style="width:100%; height:320px;"></canvas>
+      <div style="display:flex; gap:16px; margin-top:8px; flex-wrap:wrap;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--blue);">— MA 20</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);">— MA 50</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#ab47bc;">— MA 200</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-muted);">░ Bollinger</span>
+      </div>
+    </div>
+
+    <div class="grid" style="margin-bottom:16px;">
+      <div class="card fade-in">
+        <h2>RSI (14)</h2>
+        <canvas id="rsiChart" style="width:100%; height:120px;"></canvas>
+      </div>
+      <div class="card fade-in">
+        <h2>MACD</h2>
+        <canvas id="macdChart" style="width:100%; height:120px;"></canvas>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card full fade-in">
+        ${narrativeHTML}
+        <h2>Signal Breakdown</h2>
+        ${signalGroupsHTML}
+      </div>
+      <div class="card fade-in">
+        <h2>Key Levels</h2>
+        ${maHTML}
+      </div>
+      <div class="card fade-in">
+        <h2>ATR (14d)</h2>
+        <div class="context-stat">
+          <div class="stat-value">${result.atrPct ? result.atrPct.toFixed(2) + '%' : '—'}</div>
+          <div class="stat-label">Daily Range</div>
+        </div>
+      </div>
+      <div class="card full fade-in">
+        <h2>Historical Context</h2>
+        <div class="hold-tabs" id="holdTabs">
+          ${holdTabsHTML}
+        </div>
+        <div id="holdPanels">
+          ${holdPanelsHTML}
+        </div>
+      </div>
+    </div>
+
+    <div class="footer fade-in">
+      Research tool only — not financial advice.<br>
+      Always use proper risk management.
+    </div>
+  `;
+
+  document.getElementById("dashboard").style.display = "block";
+
+  // --- Draw Charts ---
+  function drawPriceChart(chartData) {
+    const canvas = document.getElementById("priceChart");
+    if (!canvas) return;
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    const ctx = canvas.getContext("2d");
+    ctx.scale(dpr, dpr);
+    const W = rect.width, H = rect.height;
+
+    const pad = { top: 10, right: 60, bottom: 24, left: 10 };
+    const cW = W - pad.left - pad.right;
+    const cH = H - pad.top - pad.bottom;
+
+    // Price range
+    let minP = Infinity, maxP = -Infinity;
+    for (const d of chartData) {
+      const lo = Math.min(d.low, d.bbLower || Infinity);
+      const hi = Math.max(d.high, d.bbUpper || -Infinity);
+      if (lo < minP) minP = lo;
+      if (hi > maxP) maxP = hi;
+    }
+    const pRange = maxP - minP;
+    minP -= pRange * 0.03;
+    maxP += pRange * 0.03;
+
+    const n = chartData.length;
+    const candleW = Math.max(1, (cW / n) * 0.6);
+    const gap = cW / n;
+
+    function x(i) { return pad.left + i * gap + gap / 2; }
+    function y(p) { return pad.top + (1 - (p - minP) / (maxP - minP)) * cH; }
+
+    // Background
+    ctx.fillStyle = "transparent";
+    ctx.fillRect(0, 0, W, H);
+
+    // Grid lines
+    ctx.strokeStyle = "#1a1a26";
+    ctx.lineWidth = 1;
+    const gridLevels = 5;
+    for (let g = 0; g <= gridLevels; g++) {
+      const py = pad.top + (cH / gridLevels) * g;
+      ctx.beginPath(); ctx.moveTo(pad.left, py); ctx.lineTo(W - pad.right, py); ctx.stroke();
+      const price = maxP - ((maxP - minP) / gridLevels) * g;
+      ctx.fillStyle = "#4a4a5e";
+      ctx.font = "11px 'JetBrains Mono', monospace";
+      ctx.textAlign = "left";
+      ctx.fillText(price.toFixed(0), W - pad.right + 6, py + 4);
+    }
+
+    // Bollinger Bands fill
+    ctx.beginPath();
+    let bbStarted = false;
+    for (let i = 0; i < n; i++) {
+      if (chartData[i].bbUpper != null) {
+        if (!bbStarted) { ctx.moveTo(x(i), y(chartData[i].bbUpper)); bbStarted = true; }
+        else ctx.lineTo(x(i), y(chartData[i].bbUpper));
+      }
+    }
+    for (let i = n - 1; i >= 0; i--) {
+      if (chartData[i].bbLower != null) ctx.lineTo(x(i), y(chartData[i].bbLower));
+    }
+    ctx.closePath();
+    ctx.fillStyle = "rgba(68, 138, 255, 0.06)";
+    ctx.fill();
+
+    // Bollinger band lines
+    ctx.strokeStyle = "rgba(68, 138, 255, 0.2)";
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 3]);
+    for (const key of ["bbUpper", "bbLower"]) {
+      ctx.beginPath();
+      let started = false;
+      for (let i = 0; i < n; i++) {
+        if (chartData[i][key] != null) {
+          if (!started) { ctx.moveTo(x(i), y(chartData[i][key])); started = true; }
+          else ctx.lineTo(x(i), y(chartData[i][key]));
+        }
+      }
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+
+    // Candles
+    for (let i = 0; i < n; i++) {
+      const d = chartData[i];
+      const bullish = d.close >= d.open;
+      const color = bullish ? "#00e676" : "#ff5252";
+      const bodyTop = y(Math.max(d.open, d.close));
+      const bodyBot = y(Math.min(d.open, d.close));
+      const bodyH = Math.max(1, bodyBot - bodyTop);
+
+      // Wick
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x(i), y(d.high));
+      ctx.lineTo(x(i), y(d.low));
+      ctx.stroke();
+
+      // Body
+      ctx.fillStyle = bullish ? "rgba(0, 230, 118, 0.8)" : "rgba(255, 82, 82, 0.8)";
+      ctx.fillRect(x(i) - candleW / 2, bodyTop, candleW, bodyH);
+    }
+
+    // Moving averages
+    const maConfigs = [
+      { key: "ma20", color: "#448aff", width: 1.5 },
+      { key: "ma50", color: "#ffd740", width: 1.5 },
+      { key: "ma200", color: "#ab47bc", width: 1.5 },
+    ];
+
+    for (const ma of maConfigs) {
+      ctx.strokeStyle = ma.color;
+      ctx.lineWidth = ma.width;
+      ctx.beginPath();
+      let started = false;
+      for (let i = 0; i < n; i++) {
+        const val = chartData[i][ma.key];
+        if (val != null) {
+          if (!started) { ctx.moveTo(x(i), y(val)); started = true; }
+          else ctx.lineTo(x(i), y(val));
+        }
+      }
+      ctx.stroke();
+    }
+
+    // Date labels
+    ctx.fillStyle = "#4a4a5e";
+    ctx.font = "10px 'JetBrains Mono', monospace";
+    ctx.textAlign = "center";
+    const labelEvery = Math.ceil(n / 6);
+    for (let i = 0; i < n; i += labelEvery) {
+      const d = new Date(chartData[i].date);
+      const label = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      ctx.fillText(label, x(i), H - 4);
+    }
+  }
+
+  function drawRSIChart(chartData) {
+    const canvas = document.getElementById("rsiChart");
+    if (!canvas) return;
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    const ctx = canvas.getContext("2d");
+    ctx.scale(dpr, dpr);
+    const W = rect.width, H = rect.height;
+
+    const pad = { top: 8, right: 40, bottom: 4, left: 10 };
+    const cW = W - pad.left - pad.right;
+    const cH = H - pad.top - pad.bottom;
+    const n = chartData.length;
+    const gap = cW / n;
+
+    function x(i) { return pad.left + i * gap + gap / 2; }
+    function y(v) { return pad.top + (1 - v / 100) * cH; }
+
+    // Zones
+    ctx.fillStyle = "rgba(255, 82, 82, 0.05)";
+    ctx.fillRect(pad.left, y(100), cW, y(70) - y(100));
+    ctx.fillStyle = "rgba(0, 230, 118, 0.05)";
+    ctx.fillRect(pad.left, y(30), cW, y(0) - y(30));
+
+    // Level lines
+    ctx.strokeStyle = "#2a2a3a";
+    ctx.lineWidth = 1;
+    for (const lvl of [30, 50, 70]) {
+      ctx.beginPath(); ctx.moveTo(pad.left, y(lvl)); ctx.lineTo(W - pad.right, y(lvl)); ctx.stroke();
+      ctx.fillStyle = "#4a4a5e";
+      ctx.font = "10px 'JetBrains Mono', monospace";
+      ctx.textAlign = "left";
+      ctx.fillText(lvl, W - pad.right + 4, y(lvl) + 4);
+    }
+
+    // RSI line
+    ctx.strokeStyle = "#448aff";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    let started = false;
+    for (let i = 0; i < n; i++) {
+      const val = chartData[i].rsi14;
+      if (val != null) {
+        if (!started) { ctx.moveTo(x(i), y(val)); started = true; }
+        else ctx.lineTo(x(i), y(val));
+      }
+    }
+    ctx.stroke();
+
+    // Current value dot
+    const lastRsi = chartData[n - 1].rsi14;
+    if (lastRsi != null) {
+      ctx.fillStyle = lastRsi < 30 ? "#00e676" : lastRsi > 70 ? "#ff5252" : "#448aff";
+      ctx.beginPath(); ctx.arc(x(n - 1), y(lastRsi), 3, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  function drawMACDChart(chartData) {
+    const canvas = document.getElementById("macdChart");
+    if (!canvas) return;
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    const ctx = canvas.getContext("2d");
+    ctx.scale(dpr, dpr);
+    const W = rect.width, H = rect.height;
+
+    const pad = { top: 8, right: 40, bottom: 4, left: 10 };
+    const cW = W - pad.left - pad.right;
+    const cH = H - pad.top - pad.bottom;
+    const n = chartData.length;
+    const gap = cW / n;
+    const barW = Math.max(1, gap * 0.6);
+
+    // Find range
+    let maxVal = 0;
+    for (const d of chartData) {
+      const v = Math.max(Math.abs(d.macdHist || 0), Math.abs(d.macdLine || 0), Math.abs(d.macdSignal || 0));
+      if (v > maxVal) maxVal = v;
+    }
+    maxVal *= 1.1;
+
+    function x(i) { return pad.left + i * gap + gap / 2; }
+    function y(v) { return pad.top + (1 - (v + maxVal) / (2 * maxVal)) * cH; }
+
+    // Zero line
+    ctx.strokeStyle = "#2a2a3a";
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(pad.left, y(0)); ctx.lineTo(W - pad.right, y(0)); ctx.stroke();
+
+    // Histogram bars
+    for (let i = 0; i < n; i++) {
+      const h = chartData[i].macdHist;
+      if (h == null) continue;
+      const color = h >= 0 ? "rgba(0, 230, 118, 0.6)" : "rgba(255, 82, 82, 0.6)";
+      ctx.fillStyle = color;
+      const barTop = h >= 0 ? y(h) : y(0);
+      const barH = Math.abs(y(h) - y(0));
+      ctx.fillRect(x(i) - barW / 2, barTop, barW, barH);
+    }
+
+    // MACD & Signal lines
+    for (const [key, color] of [["macdLine", "#448aff"], ["macdSignal", "#ff9800"]]) {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      let started = false;
+      for (let i = 0; i < n; i++) {
+        const val = chartData[i][key];
+        if (val != null) {
+          if (!started) { ctx.moveTo(x(i), y(val)); started = true; }
+          else ctx.lineTo(x(i), y(val));
+        }
+      }
+      ctx.stroke();
+    }
+  }
+
+  // Draw all charts
+  drawPriceChart(result.chartData);
+  drawRSIChart(result.chartData);
+  drawMACDChart(result.chartData);
+
+  // Tab switching for hold periods
+  document.getElementById("holdTabs")?.addEventListener("click", (e) => {
+    const tab = e.target.closest(".hold-tab");
+    if (!tab) return;
+    const hold = tab.dataset.hold;
+    document.querySelectorAll(".hold-tab").forEach(t => t.classList.remove("active"));
+    document.querySelectorAll(".context-panel").forEach(p => p.classList.remove("active"));
+    tab.classList.add("active");
+    document.querySelector(`.context-panel[data-panel="${hold}"]`)?.classList.add("active");
+  });
+}
+
+// --- Init ---
+async function init() {
+  document.getElementById("dateDisplay").textContent = new Date().toLocaleDateString("en-US", {
+    weekday: "long", year: "numeric", month: "long", day: "numeric"
+  });
+
+  try {
+    const result = await computeSignals();
+    document.getElementById("loadingState").style.display = "none";
+    renderDashboard(result);
+  } catch (err) {
+    console.error(err);
+    document.getElementById("loadingState").style.display = "none";
+    document.getElementById("errorState").innerHTML = `
+      <div class="error-box">
+        <h3>Failed to load data</h3>
+        <p>${err.message}<br><br>All CORS proxies failed to reach Yahoo Finance. Try refreshing, or if this persists, try opening in a different browser or disabling ad blockers.</p>
+      </div>
+    `;
+    document.getElementById("errorState").style.display = "block";
+  }
+}
+
+init();
+</script>
+</body>
+</html>
